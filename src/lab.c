@@ -34,7 +34,7 @@ int encode_packet(const Packet *packet, uint8_t *buffer)
         return -1;
 
     int size = 10 + packet->length;
-    memset(buffer, 0, size);
+    memset(buffer, 0, (size_t)size);
 
     buffer[0] = packet->type;
 
@@ -49,7 +49,7 @@ int encode_packet(const Packet *packet, uint8_t *buffer)
 
     memcpy(buffer + 10, packet->payload, packet->length);
 
-    uint16_t check = checksum(buffer, size);
+    uint16_t check = checksum(buffer, (size_t)size);
     buffer[2] = (uint8_t)(check >> 8);
     buffer[3] = (uint8_t)check;
 
@@ -65,7 +65,7 @@ int decode_packet(const uint8_t *buffer, size_t size, Packet *packet)
     uint16_t length = ((uint16_t)buffer[8] << 8) | buffer[9];
 
     if (buffer[0] > FIN || buffer[1] != 0 ||
-        length > MAX_PAYLOAD || size != 10 + length)
+        length > MAX_PAYLOAD || size != (size_t)(10 + length))
         return -1;
 
     if (buffer[0] != DATA && length != 0)
@@ -101,7 +101,7 @@ void sender_init(Sender *sender, int window, int timeout)
 // Check whether the sender has room in its window
 int sender_can_send(const Sender *sender)
 {
-    return sender->next < sender->base + sender->window;
+    return sender->next < sender->base + (uint32_t)sender->window;
 }
 
 // Process cumulative acknowledgments

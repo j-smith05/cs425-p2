@@ -1,7 +1,7 @@
-# Project X
+# Project P2 - Reliable Data Transfer
 
-- Name: John Doe
-- Email: johndoe@u.boisestate.edu
+- Name: Jacob Smith
+- Email: jacobsmith214@u.boisestate.edu
 - Class: CS123-001
 
 ## Known Bugs or Issues
