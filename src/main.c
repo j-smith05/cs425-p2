@@ -1,4 +1,3 @@
-
 #define _POSIX_C_SOURCE 200809L
 
 #include "lab.h"
@@ -90,7 +89,7 @@ static int hello(int fd, const char *mode, const char *session,
         snprintf(msg, sizeof(msg), "HELLO %s send %.6g %.6g %.6g",
                  session, loss, corrupt, dup);
 
-    // Retry registration up to five times
+    // Try registering up to five times
     for (int i = 0; i < 5; i++)
     {
         if (send(fd, msg, strlen(msg), 0) < 0)
@@ -130,7 +129,7 @@ static int hello(int fd, const char *mode, const char *session,
     return -1;
 }
 
-// Receive a file and acknowledge packets
+// Receive the file and send ACKs
 static int receive_file(int fd, const char *path)
 {
     FILE *f = fopen(path, "wb");
@@ -190,14 +189,14 @@ static int receive_file(int fd, const char *path)
 
         if (action == 1)
         {
-            // Write an in-order DATA packet
+            // Write the packet data to the file
             if (fwrite(packet.payload, 1, packet.length, f)
                 != packet.length)
                 break;
         }
         else if (action == 2)
         {
-            // FIN received, close file and linger
+            // FIN received, close the file but keep listening
             if (fclose(f))
             {
                 f = NULL;
@@ -208,6 +207,7 @@ static int receive_file(int fd, const char *path)
             linger_until = now_ms() + 2000;
         }
 
+        // Tell the sender which packet we need next
         if (send_packet(fd, ACK, receiver.expected, NULL, 0))
             break;
     }
@@ -266,7 +266,7 @@ static int send_file(int fd, const char *path, int window, int timeout)
 
     while (state.base <= count)
     {
-        // Send packets while the window has room
+        // Send packets while there is room in the window
         uint32_t limit = state.base == count ? count + 1 : count;
 
         while (state.next < limit && sender_can_send(&state))
@@ -292,7 +292,10 @@ static int send_file(int fd, const char *path, int window, int timeout)
         }
 
         // Wait for an ACK or timeout
-        long long remaining = state.timer_start + timeout - now_ms();
+        long long remaining = timeout;
+
+        if (state.timer_start >= 0)
+            remaining = state.timer_start + timeout - now_ms();
 
         struct pollfd pfd = {.fd = fd, .events = POLLIN};
 
@@ -326,7 +329,7 @@ static int send_file(int fd, const char *path, int window, int timeout)
         }
         else
         {
-            // Timeout: resend all unacknowledged packets
+            // Timeout, resend packets that haven't been ACKed
             int timed = sender_timeout(&state, now_ms());
 
             if (timed < 0)
@@ -362,7 +365,7 @@ done:
     return status;
 }
 
-// Print command usage
+// Print how to run the program
 static void usage(void)
 {
     puts("Usage: myapp send -s <session> [-w window] "
@@ -403,7 +406,7 @@ int main(int argc, char **argv)
 
     optind = 2;
 
-    // Read command-line options
+    // Read the command line options
     while ((opt = getopt(argc, argv, "s:w:T:l:c:d:p:")) != -1)
     {
         switch (opt)
@@ -436,7 +439,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // Check command-line arguments
+    // Make sure the arguments are valid
     if (!session || !*session || strlen(session) > 32 ||
         optind + 2 != argc ||
         window < 1 || window > 64 ||
@@ -449,7 +452,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Check session name
+    // Check the session name
     for (const char *s = session; *s; s++)
     {
         if (!((*s >= 'a' && *s <= 'z') ||
